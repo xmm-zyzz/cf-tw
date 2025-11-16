@@ -23,7 +23,7 @@ jobs:
       - name: Install Obfuscator
         run: npm install javascript-obfuscator
 
-      - name: Obfuscate from local source file (Final Recommended)
+      - name: Obfuscate from local source file (Performance-First)
         run: |
           node -e "
             const JavaScriptObfuscator = require('javascript-obfuscator');
@@ -46,20 +46,19 @@ jobs:
               process.exit(1);
             }
 
-            // --- 最终推荐配置 (平衡强度与性能) ---
+            // --- 最终性能优先配置 (为 CF Workers 优化) ---
             const obfuscationOptions = {
                 compact: true,
-                controlFlowFlattening: false, // 【已禁用】避免内存超限
+                controlFlowFlattening: false, // 【已禁用】避免内存/CPU超限
                 deadCodeInjection: false, // 【已禁用】
                 stringArray: true,
-                stringArrayEncoding: ['rc4'], // 使用更强的 RC4 编码
+                stringArrayEncoding: ['base64'], // 【已降级】使用更快的 base64 编码以避免 CPU 超限
                 stringArrayThreshold: 0.75,
                 renameGlobals: false, // 【已禁用】
                 identifierNamesGenerator: 'mangled',
-                numbersToExpressions: true, // 【已启用】将数字转换为表达式
-                splitStrings: true, // 【已启用】分割字符串
-                splitStringsChunkLength: 5, // 缩短分块长度
-                transformObjectKeys: true, // 【已启用】混淆对象键
+                numbersToExpressions: true, // 【已启用】
+                splitStrings: false, // 【已禁用】避免 CPU 超限
+                transformObjectKeys: false, // 【已禁用】避免 CPU 超限
                 selfDefending: true, // 【已启用】
                 debugProtection: false
             };
@@ -78,6 +77,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit, the obfuscated file is already up-to-date."
           else
-            git commit -m "build: Final recommended obfuscation configuration"
+            git commit -m "build: Final performance-first obfuscation configuration"
             git push
           fi
