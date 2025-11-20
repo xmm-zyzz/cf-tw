@@ -1,4 +1,4 @@
-name: snippets
+name: tw
 
 on:
   workflow_dispatch:
@@ -28,12 +28,12 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
-            const sourceFileName = 'snippets';
+            const sourceFileName = 'tw';
             const outputFileName = '_worker.js';
             const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
             if (!fs.existsSync(sourceFilePath)) {
-              console.error(`错误：在路径 '$\{sourceFilePath\}' 未找到源文件。请确保您的仓库根目录有名为 'snippets' 的文件。`);
+              console.error(`错误：在路径 '$\{sourceFilePath\}' 未找到源文件。请确保您的仓库根目录有名为 'tw' 的文件。`);
               process.exit(1);
             }
 
