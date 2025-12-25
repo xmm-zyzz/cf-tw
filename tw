@@ -1,24 +1,13 @@
 import { connect } from 'cloudflare:sockets';
-
-// --- 硬编码配置 ---
-// UUID，同时用作订阅路径。
 const authToken = 'e258977b-e413-4718-a3af-02d75492c349';
-// 用来访问cloudflare托管的网站
 const fallbackAddress = 'tw.x9527.xyz';
-// 备用端口。
 const fallbackPort = '443';
-// SOCKS5 代理配置。留空则禁用。格式: user:pass@host:port
 const socks5Config = '';
-
-
 const directDomains = [
     { name: "cloudflare.182682.xyz", domain: "cloudflare.182682.xyz" }, { name: "www.shopify.com", domain: "www.shopify.com" }, { name: "www.udacity.com", domain: "www.udacity.com" },
 ];
-
-
 const parsedSocks5Config = {};
 const isSocksEnabled = false;
-
 const E_INVALID_DATA = atob('aW52YWxpZCBkYXRh');
 const E_INVALID_USER = atob('aW52YWxpZCB1c2Vy');
 const E_UNSUPPORTED_CMD = atob('Y29tbWFuZCBpcyBub3Qgc3VwcG9ydGVk');
@@ -32,11 +21,9 @@ const E_SOCKS_NO_METHOD = atob('bm8gYWNjZXB0YWJsZSBtZXRob2Rz');
 const E_SOCKS_AUTH_NEEDED = atob('c29ja3Mgc2VydmVyIG5lZWRzIGF1dGg=');
 const E_SOCKS_AUTH_FAIL = atob('ZmFpbCB0byBhdXRoIHNvY2tzIHNlcnZlcg==');
 const E_SOCKS_CONN_FAIL = atob('ZmFpbCB0byBvcGVuIHNvY2tzIGNvbm5lY3Rpb24=');
-
 const ADDRESS_TYPE_IPV4 = 1;
 const ADDRESS_TYPE_URL = 2;
 const ADDRESS_TYPE_IPV6 = 3;
-
 export default {
 	async fetch(request, env, ctx) {
 		try {
@@ -60,7 +47,6 @@ export default {
 		}
 	},
 };
-
 async function handleSubscriptionRequest(request, uuid) {
     const url = new URL(request.url);
     const finalLinks = [];
@@ -83,7 +69,7 @@ async function handleSubscriptionRequest(request, uuid) {
     }
 
     if (finalLinks.length === 0) {
-        const errorRemark = "所有节点获取失败-请到CF后台查看Worker日志";
+        const errorRemark = "所有节点获取失败";
         const errorLink = `vless://00000000-0000-0000-0000-000000000000@127.0.0.1:80?encryption=none&security=none&type=ws&host=error.com&path=%2F#${encodeURIComponent(errorRemark)}`;
         finalLinks.push(errorLink);
     }
@@ -97,7 +83,6 @@ async function handleSubscriptionRequest(request, uuid) {
         },
     });
 }
-
 function generateLinksFromSource(list, uuid, workerDomain) {
     const httpsPorts = [443];
     const httpPorts = [];
@@ -122,7 +107,6 @@ function generateLinksFromSource(list, uuid, workerDomain) {
             });
             links.push(`${proto}://${uuid}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
         });
-
         httpPorts.forEach(port => {
             const wsNodeName = `${nodeNameBase}-${port}-WS`;
             const wsParams = new URLSearchParams({
@@ -137,7 +121,6 @@ function generateLinksFromSource(list, uuid, workerDomain) {
     });
     return links;
 }
-
 async function fetchDynamicIPs() {
     const v4Url1 = "https://www.wetest.vip/page/cloudflare/address_v4.html";
     let results = [];
@@ -152,9 +135,8 @@ async function fetchDynamicIPs() {
     } catch (e) {
         console.error("[Wetest] Failed to fetch from wetest.vip:", e);
     }
-
     console.log("[Wetest] wetest.vip failed, trying fallback IP source...");
-    const fallbackUrl = "备用订阅IP地址";
+    const fallbackUrl = "2";
     try {
         const response = await fetch(fallbackUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!response.ok) {
@@ -197,7 +179,7 @@ async function fetchAndParseWetest(url) {
         const html = await response.text();
         const results = [];
         const rowRegex = /<tr[\s\S]*?<\/tr>/g;
-        const cellRegex = /<td data-label="线路名称">(.+?)<\/td>[\s\S]*?<td data-label="优选地址">([\d.:a-fA-F]+)<\/td>/;
+        const cellRegex = /<td data-label="1">(.+?)<\/td>[\s\S]*?<td data-label="优选地址">([\d.:a-fA-F]+)<\/td>/;
 
         let match;
         while ((match = rowRegex.exec(html)) !== null) {
@@ -223,7 +205,7 @@ async function fetchAndParseWetest(url) {
 }
 
 async function fetchAndParseNewIPs() {
-    const url = "https://ccq.xmma.top/heads/main/transformed_result.csv?token=CCQ";
+    const url = "";
     let results = [];
     try {
         const response = await fetch(url);
@@ -322,7 +304,6 @@ async function handleWsRequest(request) {
 
     return new Response(null, { status: 101, webSocket: clientSock });
 }
-
 async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remoteConnWrapper) {
     async function connectAndSend(address, port) {
         const remoteSock = isSocksEnabled ?
@@ -350,7 +331,6 @@ async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remo
         retryConnection();
     }
 }
-
 function parseWsPacketHeader(chunk, token) {
 	if (chunk.byteLength < 24) return { hasError: true, message: E_INVALID_DATA };
 	const version = new Uint8Array(chunk.slice(0, 1));
@@ -420,7 +400,6 @@ async function forwardUDP(udpChunk, webSocket, respHeader) {
 		}));
 	} catch (error) { console.error(`DNS forward error: ${error.message}`); }
 }
-
 async function establishSocksConnection(addrType, address, port) {
 	const { username, password, hostname, socksPort } = parsedSocks5Config;
 	const socket = connect({ hostname, port: socksPort });
