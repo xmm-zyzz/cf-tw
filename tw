@@ -4,7 +4,6 @@ const fallbackAddress = 'tw.x9527.xyz';
 const fallbackPort = '443';
 const socks5Config = '';
 const directDomains = [
-    { domain: "www.shopify.com", name: "shopify"},
 ];
 const parsedSocks5Config = {};
 const isSocksEnabled = false;
@@ -171,30 +170,22 @@ async function handleSubscriptionRequest(request, uuid) {
     const workerDomain = url.hostname;
 
     let echConfig = null;
-    try {
-        if (enableECH) {
-            echConfig = await fetchECHConfig(workerDomain);
-        }
-    } catch (e) {
-        console.warn('[handleSubscriptionRequest]ECH Error:', e);
+    if (enableECH) {
+        echConfig = await fetchECHConfig(workerDomain);
     }
 
-    const nativeList = [{ ip: workerDomain, isp: '原' }];
-    finalLinks.push(...generateLinksFromSource(nativeList, uuid, workerDomain, echConfig));
+    // 注意：这里已经移除了 nativeList 的生成代码，因此不会再输出“原”节点
 
-    const domainList = directDomains.map(d => ({ 
-        ip: d.domain || d.name, 
-        isp: d.name || d.domain 
-    }));
+    const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
     finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain, echConfig));
 
     const dynamicIPList = await fetchDynamicIPs();
-    if (dynamicIPList && dynamicIPList.length > 0) {
+    if (dynamicIPList.length > 0) {
         finalLinks.push(...generateLinksFromSource(dynamicIPList, uuid, workerDomain, echConfig));
     }
 
     const newIPList = await fetchAndParseNewIPs();
-    if (newIPList && newIPList.length > 0) {
+    if (newIPList.length > 0) {
         finalLinks.push(...generateLinksFromNewIPs(newIPList, uuid, workerDomain, echConfig));
     }
 
@@ -223,6 +214,7 @@ async function handleSubscriptionRequest(request, uuid) {
         headers: responseHeaders,
     });
 }
+
 
 function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
     const httpsPorts = [443];
