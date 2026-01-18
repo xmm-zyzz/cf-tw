@@ -4,7 +4,7 @@ const fallbackAddress = 'tw.x9527.xyz';
 const fallbackPort = '443';
 const socks5Config = '';
 const directDomains = [
-    { name: "www.shopify.com"},
+    { domain: "www.shopify.com", name: "shopify"},
 ];
 const parsedSocks5Config = {};
 const isSocksEnabled = false;
@@ -44,7 +44,8 @@ async function fetchECHConfig(domain) {
         const echResponse = await fetch(echDomainUrl, {
             headers: {
                 'Accept': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(5000)
         });
         
         debugSteps.push(`Google DNS 响应状态: ${echResponse.status}`);
@@ -63,7 +64,6 @@ async function fetchECHConfig(domain) {
                             echDebugInfo = debugSteps.join('\\n') + '\\n✅ 成功从 Google DNS 获取 ECH 配置';
                             return echMatch[1];
                         }
-                        // 尝试 base64 解码
                         try {
                             const decoded = atob(answer.data);
                             const decodedMatch = decoded.match(/ech=([^\s"']+)/);
@@ -84,7 +84,8 @@ async function fetchECHConfig(domain) {
         const response = await fetch(dohUrl, {
             headers: {
                 'Accept': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(5000)
         });
         
         debugSteps.push(`Google DNS (目标域名) 响应状态: ${response.status}`);
@@ -110,7 +111,8 @@ async function fetchECHConfig(domain) {
         const cfResponse = await fetch(cfEchUrl, {
             headers: {
                 'Accept': 'application/dns-json'
-            }
+            },
+            signal: AbortSignal.timeout(5000)
         });
         
         debugSteps.push(`Cloudflare DNS 响应状态: ${cfResponse.status}`);
@@ -137,7 +139,6 @@ async function fetchECHConfig(domain) {
         return null;
     }
 }
-// ------------------------------------------
 
 export default {
 	async fetch(request, env, ctx) {
@@ -158,6 +159,7 @@ export default {
 			}
 			return new Response('Not Found', { status: 404 });
 		} catch (err) {
+			console.error('[Worker Error]', err);
 			return new Response(err.toString(), { status: 500 });
 		}
 	},
@@ -169,24 +171,31 @@ async function handleSubscriptionRequest(request, uuid) {
     const workerDomain = url.hostname;
 
     let echConfig = null;
-    if (enableECH) {
-        echConfig = await fetchECHConfig(workerDomain);
+    try {
+        if (enableECH) {
+            echConfig = await fetchECHConfig(workerDomain);
+        }
+    } catch (e) {
+        console.warn('[handleSubscriptionRequest] ECH 配置获取失败:', e);
     }
 
     const nativeList = [{ ip: workerDomain, isp: '原' }];
-
     finalLinks.push(...generateLinksFromSource(nativeList, uuid, workerDomain, echConfig));
 
-    const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
+    // 修复：兼容 domain 和 name 属性
+    const domainList = directDomains.map(d => ({ 
+        ip: d.domain || d.name, 
+        isp: d.name || d.domain 
+    }));
     finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain, echConfig));
 
     const dynamicIPList = await fetchDynamicIPs();
-    if (dynamicIPList.length > 0) {
+    if (dynamicIPList && dynamicIPList.length > 0) {
         finalLinks.push(...generateLinksFromSource(dynamicIPList, uuid, workerDomain, echConfig));
     }
 
     const newIPList = await fetchAndParseNewIPs();
-    if (newIPList.length > 0) {
+    if (newIPList && newIPList.length > 0) {
         finalLinks.push(...generateLinksFromNewIPs(newIPList, uuid, workerDomain, echConfig));
     }
 
@@ -223,8 +232,18 @@ function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
     const wsPath = encodeURIComponent('/?ed=2095');
     const proto = 'vless';
 
+    if (!Array.isArray(list)) {
+        console.warn('[generateLinksFromSource] 列表不是数组:', list);
+        return links;
+    }
+
     list.forEach(item => {
-        const nodeNameBase = item.isp.replace(/\s/g, '_');
+        if (!item || !item.ip) {
+            console.warn('[generateLinksFromSource] 跳过无效项:', item);
+            return;
+        }
+        
+        const nodeNameBase = (item.isp || item.name || 'unknown').replace(/\s/g, '_');
         const safeIP = item.ip.includes(':') ? `[${item.ip}]` : item.ip;
 
         httpsPorts.forEach(port => {
@@ -242,7 +261,7 @@ function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
             });
 
             if (enableECH && echConfig) {
-                wsParams.set('fp', 'chrome'); // ECH 必须使用 chrome 指纹
+                wsParams.set('fp', 'chrome');
                 wsParams.set('alpn', 'h3,h2,http/1.1');
                 wsParams.set('ech', echConfig);
             }
@@ -269,8 +288,18 @@ function generateLinksFromNewIPs(list, uuid, workerDomain, echConfig = null) {
     const wsPath = encodeURIComponent('/?ed=2095');
     const proto = 'vless';
 
+    if (!Array.isArray(list)) {
+        console.warn('[generateLinksFromNewIPs] 列表不是数组:', list);
+        return links;
+    }
+
     list.forEach(item => {
-        const nodeName = item.name;
+        if (!item || !item.ip || !item.port) {
+            console.warn('[generateLinksFromNewIPs] 跳过无效项:', item);
+            return;
+        }
+        
+        const nodeName = item.name || 'unknown';
         const safeIP = item.ip.includes(':') ? `[${item.ip}]` : item.ip;
 
         let fp = 'randomized';
@@ -311,10 +340,14 @@ async function fetchDynamicIPs() {
     } catch (e) {
         console.error("[Wetest] Failed to fetch from wetest.vip:", e);
     }
+    
     console.log("[Wetest] wetest.vip failed, trying fallback IP source...");
     const fallbackUrl = "2";
     try {
-        const response = await fetch(fallbackUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const response = await fetch(fallbackUrl, { 
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(8000)
+        });
         if (!response.ok) {
             console.error(`[Hostmonit] Fallback source failed with status: ${response.status}`);
             return [];
@@ -347,7 +380,10 @@ async function fetchDynamicIPs() {
 
 async function fetchAndParseWetest(url) {
     try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const response = await fetch(url, { 
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(8000)
+        });
         if (!response.ok) {
             console.error(`[Wetest] Failed to fetch ${url}, status: ${response.status}`);
             return [];
@@ -383,8 +419,14 @@ async function fetchAndParseWetest(url) {
 async function fetchAndParseNewIPs() {
     const url = "";
     let results = [];
+    
+    if (!url || url.trim() === '') {
+        console.warn("[GitHub Source] URL 未配置，跳过");
+        return [];
+    }
+    
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
         if (!response.ok) {
             console.error(`[GitHub Source] Failed to fetch new IPs, status: ${response.status}`);
             return [];
@@ -454,6 +496,7 @@ async function handleWsRequest(request) {
 
     return new Response(null, { status: 101, webSocket: clientSock });
 }
+
 async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remoteConnWrapper) {
     async function connectAndSend(address, port) {
         const remoteSock = isSocksEnabled ?
@@ -481,6 +524,7 @@ async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remo
         retryConnection();
     }
 }
+
 function parseWsPacketHeader(chunk, token) {
 	if (chunk.byteLength < 24) return { hasError: true, message: E_INVALID_DATA };
 	const version = new Uint8Array(chunk.slice(0, 1));
@@ -550,6 +594,7 @@ async function forwardUDP(udpChunk, webSocket, respHeader) {
 		}));
 	} catch (error) { console.error(`DNS forward error: ${error.message}`); }
 }
+
 async function establishSocksConnection(addrType, address, port) {
 	const { username, password, hostname, socksPort } = parsedSocks5Config;
 	const socket = connect({ hostname, port: socksPort });
