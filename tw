@@ -1,15 +1,23 @@
 import { connect } from 'cloudflare:sockets';
+
+// --- 硬编码配置 ---
+// UUID，同时用作订阅路径。
 const authToken = 'e258977b-e413-4718-a3af-02d75492c349';
+// 用来访问cloudflare托管的网站
 const fallbackAddress = 'tw.x9527.xyz';
+// 备用端口。
 const fallbackPort = '443';
+// SOCKS5 代理配置。留空则禁用。格式: user:pass@host:port
 const socks5Config = '';
+
+
 const directDomains = [
+    { name: "cloudflare.182682.xyz", domain: "cloudflare.182682.xyz" }, { name: "www.shopify.com", domain: "www.shopify.com" }, { name: "www.udacity.com", domain: "www.udacity.com" },
 ];
+
+
 const parsedSocks5Config = {};
 const isSocksEnabled = false;
-
-let enableECH = true;  
-let echDebugInfo = '';
 
 const E_INVALID_DATA = atob('aW52YWxpZCBkYXRh');
 const E_INVALID_USER = atob('aW52YWxpZCB1c2Vy');
@@ -24,120 +32,10 @@ const E_SOCKS_NO_METHOD = atob('bm8gYWNjZXB0YWJsZSBtZXRob2Rz');
 const E_SOCKS_AUTH_NEEDED = atob('c29ja3Mgc2VydmVyIG5lZWRzIGF1dGg=');
 const E_SOCKS_AUTH_FAIL = atob('ZmFpbCB0byBhdXRoIHNvY2tzIHNlcnZlcg==');
 const E_SOCKS_CONN_FAIL = atob('ZmFpbCB0byBvcGVuIHNvY2tzIGNvbm5lY3Rpb24=');
+
 const ADDRESS_TYPE_IPV4 = 1;
 const ADDRESS_TYPE_URL = 2;
 const ADDRESS_TYPE_IPV6 = 3;
-
-async function fetchECHConfig(domain) {
-    if (!enableECH) {
-        echDebugInfo = 'ECH-NO';
-        return null;
-    }
-    
-    echDebugInfo = '';
-    const debugSteps = [];
-    
-    try {
-        debugSteps.push('Google DNS ');
-        const echDomainUrl = `https://dns.google/resolve?name=cloudflare-ech.com&type=65`;
-        const echResponse = await fetch(echDomainUrl, {
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(5000)
-        });
-        
-        debugSteps.push(`Google DNS: ${echResponse.status}`);
-        
-        if (echResponse.ok) {
-            const echData = await echResponse.json();
-            debugSteps.push(`Google DNS: ${JSON.stringify(echData).substring(0, 200)}...`);
-            
-            if (echData.Answer && echData.Answer.length > 0) {
-                debugSteps.push(` ${echData.Answer.length} `);
-                for (const answer of echData.Answer) {
-                    if (answer.data) {
-                        const dataStr = typeof answer.data === 'string' ? answer.data : JSON.stringify(answer.data);
-                        const echMatch = dataStr.match(/ech=([^\s"']+)/);
-                        if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ Use Google DNS';
-                            return echMatch[1];
-                        }
-                        try {
-                            const decoded = atob(answer.data);
-                            const decodedMatch = decoded.match(/ech=([^\s"']+)/);
-                            if (decodedMatch && decodedMatch[1]) {
-                                echDebugInfo = debugSteps.join('\\n') + '\\n✅ Successfully retrieved ECH configuration from Google DNS';
-                                return decodedMatch[1];
-                            }
-                        } catch (e) {
-                            debugSteps.push(`base64 解码失败: ${e.message}`);
-                        }
-                    }
-                }
-            }
-        }
-        
-        debugSteps.push(`Try Google DNS  ${domain}...`);
-        const dohUrl = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=65`;
-        const response = await fetch(dohUrl, {
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(5000)
-        });
-        
-        debugSteps.push(`Google DNS : ${response.status}`);
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.Answer && data.Answer.length > 0) {
-                for (const answer of data.Answer) {
-                    if (answer.data) {
-                        const dataStr = typeof answer.data === 'string' ? answer.data : JSON.stringify(answer.data);
-                        const echMatch = dataStr.match(/ech=([^\s"']+)/);
-                        if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ Google DNS 获取 ECH 配置';
-                            return echMatch[1];
-                        }
-                    }
-                }
-            }
-        }
-        
-        debugSteps.push('Cloudflare DNS 作为备选...');
-        const cfEchUrl = `https://cloudflare-dns.com/dns-query?name=cloudflare-ech.com&type=65`;
-        const cfResponse = await fetch(cfEchUrl, {
-            headers: {
-                'Accept': 'application/dns-json'
-            },
-            signal: AbortSignal.timeout(5000)
-        });
-        
-        debugSteps.push(`Cloudflare DNS : ${cfResponse.status}`);
-        
-        if (cfResponse.ok) {
-            const cfData = await cfResponse.json();
-            if (cfData.Answer && cfData.Answer.length > 0) {
-                for (const answer of cfData.Answer) {
-                    if (answer.data) {
-                        const echMatch = answer.data.match(/ech=([^\s"']+)/);
-                        if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅  Cloudflare DNS 获取 ECH 配置';
-                            return echMatch[1];
-                        }
-                    }
-                }
-            }
-        }
-            
-        echDebugInfo = debugSteps.join('\\n') + '\\n❌ 未获取到ECH配置';
-        return null;
-    } catch (error) {
-        echDebugInfo = debugSteps.join('\\n') + '\\n❌ ECH Error: ' + error.message;
-        return null;
-    }
-}
 
 export default {
 	async fetch(request, env, ctx) {
@@ -158,7 +56,6 @@ export default {
 			}
 			return new Response('Not Found', { status: 404 });
 		} catch (err) {
-			console.error('[Worker Error]', err);
 			return new Response(err.toString(), { status: 500 });
 		}
 	},
@@ -169,96 +66,63 @@ async function handleSubscriptionRequest(request, uuid) {
     const finalLinks = [];
     const workerDomain = url.hostname;
 
-    let echConfig = null;
-    if (enableECH) {
-        echConfig = await fetchECHConfig(workerDomain);
-    }
-
-    // 注意：这里已经移除了 nativeList 的生成代码，因此不会再输出“原”节点
+    const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
+    finalLinks.push(...generateLinksFromSource(nativeList, uuid, workerDomain));
 
     const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
-    finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain, echConfig));
+    finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain));
 
     const dynamicIPList = await fetchDynamicIPs();
     if (dynamicIPList.length > 0) {
-        finalLinks.push(...generateLinksFromSource(dynamicIPList, uuid, workerDomain, echConfig));
+        finalLinks.push(...generateLinksFromSource(dynamicIPList, uuid, workerDomain));
     }
 
     const newIPList = await fetchAndParseNewIPs();
     if (newIPList.length > 0) {
-        finalLinks.push(...generateLinksFromNewIPs(newIPList, uuid, workerDomain, echConfig));
+        finalLinks.push(...generateLinksFromNewIPs(newIPList, uuid, workerDomain));
     }
 
     if (finalLinks.length === 0) {
-        const errorRemark = "3";
+        const errorRemark = "所有节点获取失败-请到CF后台查看Worker日志";
         const errorLink = `vless://00000000-0000-0000-0000-000000000000@127.0.0.1:80?encryption=none&security=none&type=ws&host=error.com&path=%2F#${encodeURIComponent(errorRemark)}`;
         finalLinks.push(errorLink);
     }
 
     const subscriptionContent = btoa(finalLinks.join('\n'));
     
-    const responseHeaders = { 
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-    };
-
-    if (enableECH && echDebugInfo) {
-        responseHeaders['X-ECH-Debug'] = echDebugInfo.replace(/\n/g, ' | ');
-        responseHeaders['X-ECH-Status'] = echConfig ? 'SUCCESS' : 'FAILED';
-        if (echConfig) {
-            responseHeaders['X-ECH-Config-Length'] = String(echConfig.length);
-        }
-    }
-
     return new Response(subscriptionContent, {
-        headers: responseHeaders,
+        headers: { 
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        },
     });
 }
 
-
-function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
+function generateLinksFromSource(list, uuid, workerDomain) {
     const httpsPorts = [443];
     const httpPorts = [];
     const links = [];
-    const wsPath = encodeURIComponent('/?ed=2095');
+    const wsPath = encodeURIComponent('/?ed=2048');
     const proto = 'vless';
 
-    if (!Array.isArray(list)) {
-        console.warn('[generateLinksFromSource] 列表NO数组:', list);
-        return links;
-    }
-
     list.forEach(item => {
-        if (!item || !item.ip) {
-            console.warn('[generateLinksFromSource] 跳过NG:', item);
-            return;
-        }
-        
-        const nodeNameBase = (item.isp || item.name || 'unknown').replace(/\s/g, '_');
+        const nodeNameBase = item.isp.replace(/\s/g, '_');
         const safeIP = item.ip.includes(':') ? `[${item.ip}]` : item.ip;
 
         httpsPorts.forEach(port => {
             const wsNodeName = `${nodeNameBase}-${port}-WS-TLS`;
-            
-            let fp = 'randomized';
             const wsParams = new URLSearchParams({ 
                 encryption: 'none', 
                 security: 'tls', 
                 sni: workerDomain, 
-                fp: fp, 
+                fp: 'randomized', 
                 type: 'ws', 
                 host: workerDomain, 
                 path: wsPath 
             });
-
-            if (enableECH && echConfig) {
-                wsParams.set('fp', 'chrome');
-                wsParams.set('alpn', 'h3,h2,http/1.1');
-                wsParams.set('ech', echConfig);
-            }
-
             links.push(`${proto}://${uuid}@${safeIP}:${port}?${wsParams.toString()}#${encodeURIComponent(wsNodeName)}`);
         });
+
         httpPorts.forEach(port => {
             const wsNodeName = `${nodeNameBase}-${port}-WS`;
             const wsParams = new URLSearchParams({
@@ -274,51 +138,8 @@ function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
     return links;
 }
 
-function generateLinksFromNewIPs(list, uuid, workerDomain, echConfig = null) {
-    const links = [];
-    const wsPath = encodeURIComponent('/?ed=2095');
-    const proto = 'vless';
-
-    if (!Array.isArray(list)) {
-        console.warn('[generateLinksFromNewIPs] 列表NO数组:', list);
-        return links;
-    }
-
-    list.forEach(item => {
-        if (!item || !item.ip || !item.port) {
-            console.warn('[generateLinksFromNewIPs] 跳过NG项:', item);
-            return;
-        }
-        
-        const nodeName = item.name || 'unknown';
-        const safeIP = item.ip.includes(':') ? `[${item.ip}]` : item.ip;
-
-        let fp = 'randomized';
-        const params = {
-            encryption: 'none',
-            security: 'tls',
-            sni: workerDomain,
-            fp: fp,
-            type: 'ws',
-            host: workerDomain,
-            path: wsPath
-        };
-
-        const wsParams = new URLSearchParams(params);
-
-        if (enableECH && echConfig) {
-            wsParams.set('fp', 'chrome');
-            wsParams.set('alpn', 'h3,h2,http/1.1');
-            wsParams.set('ech', echConfig);
-        }
-
-        links.push(`${proto}://${uuid}@${safeIP}:${item.port}?${wsParams.toString()}#${encodeURIComponent(nodeName)}`);
-    });
-    return links;
-}
-
 async function fetchDynamicIPs() {
-    const v4Url1 = "";
+    const v4Url1 = "https://www.wetest.vip/page/cloudflare/address_v4.html";
     let results = [];
 
     try {
@@ -331,14 +152,11 @@ async function fetchDynamicIPs() {
     } catch (e) {
         console.error("[Wetest] Failed to fetch from wetest.vip:", e);
     }
-    
+
     console.log("[Wetest] wetest.vip failed, trying fallback IP source...");
-    const fallbackUrl = "2";
+    const fallbackUrl = "备用订阅IP地址";
     try {
-        const response = await fetch(fallbackUrl, { 
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(8000)
-        });
+        const response = await fetch(fallbackUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!response.ok) {
             console.error(`[Hostmonit] Fallback source failed with status: ${response.status}`);
             return [];
@@ -371,10 +189,7 @@ async function fetchDynamicIPs() {
 
 async function fetchAndParseWetest(url) {
     try {
-        const response = await fetch(url, { 
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: AbortSignal.timeout(8000)
-        });
+        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!response.ok) {
             console.error(`[Wetest] Failed to fetch ${url}, status: ${response.status}`);
             return [];
@@ -382,7 +197,7 @@ async function fetchAndParseWetest(url) {
         const html = await response.text();
         const results = [];
         const rowRegex = /<tr[\s\S]*?<\/tr>/g;
-        const cellRegex = /<td data-label="1">(.+?)<\/td>[\s\S]*?<td data-label="优">([\d.:a-fA-F]+)<\/td>/;
+        const cellRegex = /<td data-label="线路名称">(.+?)<\/td>[\s\S]*?<td data-label="优选地址">([\d.:a-fA-F]+)<\/td>/;
 
         let match;
         while ((match = rowRegex.exec(html)) !== null) {
@@ -408,16 +223,10 @@ async function fetchAndParseWetest(url) {
 }
 
 async function fetchAndParseNewIPs() {
-    const url = "https://ccq-4bs.pages.dev/heads/main/hebing.csv?token=CCQ";
+    const url = "https://ccq.xmma.top/heads/main/transformed_result.csv?token=CCQ";
     let results = [];
-    
-    if (!url || url.trim() === '') {
-        console.warn("[GitHub Source] URL 跳过");
-        return [];
-    }
-    
     try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const response = await fetch(url);
         if (!response.ok) {
             console.error(`[GitHub Source] Failed to fetch new IPs, status: ${response.status}`);
             return [];
@@ -448,6 +257,32 @@ async function fetchAndParseNewIPs() {
         return [];
     }
 }
+
+function generateLinksFromNewIPs(list, uuid, workerDomain) {
+    const links = [];
+    const wsPath = encodeURIComponent('/?ed=2048');
+    const proto = 'vless';
+
+    list.forEach(item => {
+        const nodeName = item.name;
+        const safeIP = item.ip.includes(':') ? `[${item.ip}]` : item.ip;
+
+        const params = {
+            encryption: 'none',
+            security: 'tls',
+            sni: workerDomain,
+            fp: 'randomized',
+            type: 'ws',
+            host: workerDomain,
+            path: wsPath
+        };
+
+        const wsParams = new URLSearchParams(params);
+        links.push(`${proto}://${uuid}@${safeIP}:${item.port}?${wsParams.toString()}#${encodeURIComponent(nodeName)}`);
+    });
+    return links;
+}
+
 
 async function handleWsRequest(request) {
     const wsPair = new WebSocketPair();
