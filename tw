@@ -31,7 +31,7 @@ const ADDRESS_TYPE_IPV6 = 3;
 
 async function fetchECHConfig(domain) {
     if (!enableECH) {
-        echDebugInfo = 'ECH功能已禁用';
+        echDebugInfo = 'ECH-NO';
         return null;
     }
     
@@ -39,7 +39,7 @@ async function fetchECHConfig(domain) {
     const debugSteps = [];
     
     try {
-        debugSteps.push('尝试使用 Google DNS 查询 cloudflare-ech.com...');
+        debugSteps.push('Google DNS ');
         const echDomainUrl = `https://dns.google/resolve?name=cloudflare-ech.com&type=65`;
         const echResponse = await fetch(echDomainUrl, {
             headers: {
@@ -48,27 +48,27 @@ async function fetchECHConfig(domain) {
             signal: AbortSignal.timeout(5000)
         });
         
-        debugSteps.push(`Google DNS 响应状态: ${echResponse.status}`);
+        debugSteps.push(`Google DNS: ${echResponse.status}`);
         
         if (echResponse.ok) {
             const echData = await echResponse.json();
-            debugSteps.push(`Google DNS 返回数据: ${JSON.stringify(echData).substring(0, 200)}...`);
+            debugSteps.push(`Google DNS: ${JSON.stringify(echData).substring(0, 200)}...`);
             
             if (echData.Answer && echData.Answer.length > 0) {
-                debugSteps.push(`找到 ${echData.Answer.length} 条答案记录`);
+                debugSteps.push(` ${echData.Answer.length} `);
                 for (const answer of echData.Answer) {
                     if (answer.data) {
                         const dataStr = typeof answer.data === 'string' ? answer.data : JSON.stringify(answer.data);
                         const echMatch = dataStr.match(/ech=([^\s"']+)/);
                         if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ 成功从 Google DNS 获取 ECH 配置';
+                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ Use Google DNS';
                             return echMatch[1];
                         }
                         try {
                             const decoded = atob(answer.data);
                             const decodedMatch = decoded.match(/ech=([^\s"']+)/);
                             if (decodedMatch && decodedMatch[1]) {
-                                echDebugInfo = debugSteps.join('\\n') + '\\n✅ 成功从 Google DNS (base64解码) 获取 ECH 配置';
+                                echDebugInfo = debugSteps.join('\\n') + '\\n✅ Successfully retrieved ECH configuration from Google DNS';
                                 return decodedMatch[1];
                             }
                         } catch (e) {
@@ -79,7 +79,7 @@ async function fetchECHConfig(domain) {
             }
         }
         
-        debugSteps.push(`尝试使用 Google DNS 查询目标域名 ${domain}...`);
+        debugSteps.push(`Try Google DNS  ${domain}...`);
         const dohUrl = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=65`;
         const response = await fetch(dohUrl, {
             headers: {
@@ -88,7 +88,7 @@ async function fetchECHConfig(domain) {
             signal: AbortSignal.timeout(5000)
         });
         
-        debugSteps.push(`Google DNS (目标域名) 响应状态: ${response.status}`);
+        debugSteps.push(`Google DNS : ${response.status}`);
         
         if (response.ok) {
             const data = await response.json();
@@ -98,7 +98,7 @@ async function fetchECHConfig(domain) {
                         const dataStr = typeof answer.data === 'string' ? answer.data : JSON.stringify(answer.data);
                         const echMatch = dataStr.match(/ech=([^\s"']+)/);
                         if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ 成功从 Google DNS (目标域名) 获取 ECH 配置';
+                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ Google DNS 获取 ECH 配置';
                             return echMatch[1];
                         }
                     }
@@ -106,7 +106,7 @@ async function fetchECHConfig(domain) {
             }
         }
         
-        debugSteps.push('尝试使用 Cloudflare DNS 作为备选...');
+        debugSteps.push('Cloudflare DNS 作为备选...');
         const cfEchUrl = `https://cloudflare-dns.com/dns-query?name=cloudflare-ech.com&type=65`;
         const cfResponse = await fetch(cfEchUrl, {
             headers: {
@@ -115,7 +115,7 @@ async function fetchECHConfig(domain) {
             signal: AbortSignal.timeout(5000)
         });
         
-        debugSteps.push(`Cloudflare DNS 响应状态: ${cfResponse.status}`);
+        debugSteps.push(`Cloudflare DNS : ${cfResponse.status}`);
         
         if (cfResponse.ok) {
             const cfData = await cfResponse.json();
@@ -124,7 +124,7 @@ async function fetchECHConfig(domain) {
                     if (answer.data) {
                         const echMatch = answer.data.match(/ech=([^\s"']+)/);
                         if (echMatch && echMatch[1]) {
-                            echDebugInfo = debugSteps.join('\\n') + '\\n✅ 成功从 Cloudflare DNS 获取 ECH 配置';
+                            echDebugInfo = debugSteps.join('\\n') + '\\n✅  Cloudflare DNS 获取 ECH 配置';
                             return echMatch[1];
                         }
                     }
@@ -132,10 +132,10 @@ async function fetchECHConfig(domain) {
             }
         }
             
-        echDebugInfo = debugSteps.join('\\n') + '\\n❌ 所有DNS查询均失败，未获取到ECH配置';
+        echDebugInfo = debugSteps.join('\\n') + '\\n❌ 未获取到ECH配置';
         return null;
     } catch (error) {
-        echDebugInfo = debugSteps.join('\\n') + '\\n❌ 获取ECH配置时发生错误: ' + error.message;
+        echDebugInfo = debugSteps.join('\\n') + '\\n❌ ECH Error: ' + error.message;
         return null;
     }
 }
@@ -176,13 +176,12 @@ async function handleSubscriptionRequest(request, uuid) {
             echConfig = await fetchECHConfig(workerDomain);
         }
     } catch (e) {
-        console.warn('[handleSubscriptionRequest] ECH 配置获取失败:', e);
+        console.warn('[handleSubscriptionRequest]ECH Error:', e);
     }
 
     const nativeList = [{ ip: workerDomain, isp: '原' }];
     finalLinks.push(...generateLinksFromSource(nativeList, uuid, workerDomain, echConfig));
 
-    // 修复：兼容 domain 和 name 属性
     const domainList = directDomains.map(d => ({ 
         ip: d.domain || d.name, 
         isp: d.name || d.domain 
@@ -233,13 +232,13 @@ function generateLinksFromSource(list, uuid, workerDomain, echConfig = null) {
     const proto = 'vless';
 
     if (!Array.isArray(list)) {
-        console.warn('[generateLinksFromSource] 列表不是数组:', list);
+        console.warn('[generateLinksFromSource] 列表NO数组:', list);
         return links;
     }
 
     list.forEach(item => {
         if (!item || !item.ip) {
-            console.warn('[generateLinksFromSource] 跳过无效项:', item);
+            console.warn('[generateLinksFromSource] 跳过NG:', item);
             return;
         }
         
@@ -289,13 +288,13 @@ function generateLinksFromNewIPs(list, uuid, workerDomain, echConfig = null) {
     const proto = 'vless';
 
     if (!Array.isArray(list)) {
-        console.warn('[generateLinksFromNewIPs] 列表不是数组:', list);
+        console.warn('[generateLinksFromNewIPs] 列表NO数组:', list);
         return links;
     }
 
     list.forEach(item => {
         if (!item || !item.ip || !item.port) {
-            console.warn('[generateLinksFromNewIPs] 跳过无效项:', item);
+            console.warn('[generateLinksFromNewIPs] 跳过NG项:', item);
             return;
         }
         
@@ -421,7 +420,7 @@ async function fetchAndParseNewIPs() {
     let results = [];
     
     if (!url || url.trim() === '') {
-        console.warn("[GitHub Source] URL 未配置，跳过");
+        console.warn("[GitHub Source] URL 跳过");
         return [];
     }
     
