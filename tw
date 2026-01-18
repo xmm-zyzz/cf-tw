@@ -326,7 +326,7 @@ function generateLinksFromNewIPs(list, uuid, workerDomain, echConfig = null) {
 }
 
 async function fetchDynamicIPs() {
-    const v4Url1 = "https://www.wetest.vip/page/cloudflare/address_v4.html";
+    const v4Url1 = "";
     let results = [];
 
     try {
@@ -416,7 +416,7 @@ async function fetchAndParseWetest(url) {
 }
 
 async function fetchAndParseNewIPs() {
-    const url = "";
+    const url = "https://ccq-4bs.pages.dev/heads/main/hebing.csv?token=CCQ";
     let results = [];
     
     if (!url || url.trim() === '') {
