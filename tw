@@ -60,11 +60,6 @@ async function handleSubscriptionRequest(request, uuid) {
     const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
     finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain));
 
-    const dynamicIPList = await fetchDynamicIPs();
-    if (dynamicIPList.length > 0) {
-        finalLinks.push(...generateLinksFromSource(dynamicIPList, uuid, workerDomain));
-    }
-
     const newIPList = await fetchAndParseNewIPs();
     if (newIPList.length > 0) {
         finalLinks.push(...generateLinksFromNewIPs(newIPList, uuid, workerDomain));
@@ -124,90 +119,6 @@ function generateLinksFromSource(list, uuid, workerDomain) {
         });
     });
     return links;
-}
-
-async function fetchDynamicIPs() {
-    const v4Url1 = "https://www.wetest.vip/page/cloudflare/address_v4.html";
-    let results = [];
-
-    try {
-        const ipv4List = await fetchAndParseWetest(v4Url1);
-        results = [...ipv4List];
-        if (results.length > 0) {
-            console.log(`[Wetest] Successfully fetched ${results.length} IPs from wetest.vip`);
-            return results;
-        }
-    } catch (e) {
-        console.error("[Wetest] Failed to fetch from wetest.vip:", e);
-    }
-
-    console.log("[Wetest] wetest.vip failed, trying fallback IP source...");
-    const fallbackUrl = "备用订阅IP地址";
-    try {
-        const response = await fetch(fallbackUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (!response.ok) {
-            console.error(`[Hostmonit] Fallback source failed with status: ${response.status}`);
-            return [];
-        }
-        const html = await response.text();
-        const rowRegex = /<tr><td>([\d.:a-fA-F]+)<\/td><td>.*?<\/td><td>.*?<\/td><td>.*?<\/td><td>(.*?)<\/td>.*?<\/tr>/g;
-        
-        let match;
-        while ((match = rowRegex.exec(html)) !== null) {
-            if (match[1] && match[2]) {
-                results.push({
-                    ip: match[1].trim(),
-                    isp: match[2].trim().replace(/\s/g, '')
-                });
-            }
-        }
-
-        if (results.length > 0) {
-             console.log(`[Hostmonit] Successfully fetched ${results.length} IPs from fallback source.`);
-        } else {
-            console.warn(`[Hostmonit] Warning: Could not parse any IPs from fallback source.`);
-        }
-       
-        return results;
-    } catch (e) {
-        console.error("[Hostmonit] Failed to fetch from fallback source:", e);
-        return [];
-    }
-}
-
-async function fetchAndParseWetest(url) {
-    try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (!response.ok) {
-            console.error(`[Wetest] Failed to fetch ${url}, status: ${response.status}`);
-            return [];
-        }
-        const html = await response.text();
-        const results = [];
-        const rowRegex = /<tr[\s\S]*?<\/tr>/g;
-        const cellRegex = /<td data-label="线路名称">(.+?)<\/td>[\s\S]*?<td data-label="优选地址">([\d.:a-fA-F]+)<\/td>/;
-
-        let match;
-        while ((match = rowRegex.exec(html)) !== null) {
-            const rowHtml = match[0];
-            const cellMatch = rowHtml.match(cellRegex);
-            if (cellMatch && cellMatch[1] && cellMatch[2]) {
-                results.push({
-                    isp: cellMatch[1].trim().replace(/<.*?>/g, ''),
-                    ip: cellMatch[2].trim()
-                });
-            }
-        }
-        
-        if (results.length === 0) {
-            console.warn(`[Wetest] Warning: Could not parse any IPs from ${url}.`);
-        }
-
-        return results;
-    } catch (error) {
-        console.error(`[Wetest] Error parsing ${url}:`, error);
-        return [];
-    }
 }
 
 async function fetchAndParseNewIPs() {
