@@ -2,7 +2,7 @@ import { connect } from 'cloudflare:sockets';
 
 
 const authToken = 'e258977b-e413-4718-a3af-02d75492c349';
-const fallbackAddress = 'dx.ai9527.top';
+const fallbackAddress = 'tw.x9527.xyz';
 const fallbackPort = '443';
 const socks5Config = '';
 const directDomains = [
@@ -56,9 +56,6 @@ async function handleSubscriptionRequest(request, uuid) {
     const url = new URL(request.url);
     const finalLinks = [];
     const workerDomain = url.hostname;
-
-    const nativeList = [{ ip: workerDomain, isp: '原生地址' }];
-    finalLinks.push(...generateLinksFromSource(nativeList, uuid, workerDomain));
 
     const domainList = directDomains.map(d => ({ ip: d.domain, isp: d.name || d.domain }));
     finalLinks.push(...generateLinksFromSource(domainList, uuid, workerDomain));
