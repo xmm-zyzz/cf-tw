@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - '**'
+      - '**'  # 匹配所有分支推送（排除标签推送）
     paths:
-      - 'tw'
+      - 'tw'  # 仅当 tw 文件变更时触发
 
 jobs:
   build-and-obfuscate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,10 +18,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18'  # 指定Node.js版本，确保环境一致
 
       - name: Install Obfuscator
-        run: npm install javascript-obfuscator
+        run: npm install javascript-obfuscator  # 安装JS混淆依赖
 
       - name: Obfuscate from local source file
         run: |
@@ -31,58 +30,95 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
+          // 配置文件路径
           const sourceFileName = 'tw';
           const outputFileName = '_worker.js';
           const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
+          // 检查源文件是否存在
           if (!fs.existsSync(sourceFilePath)) {
             console.error('错误：未找到源文件 ' + sourceFilePath);
             process.exit(1);
           }
 
+          // 读取源文件内容
           let originalCode = fs.readFileSync(sourceFilePath, 'utf8');
           if (!originalCode || originalCode.trim().length === 0) {
             console.error('错误：源文件为空');
             process.exit(1);
           }
 
-          // 保留 window → self 的替换（解决 window is not defined）
+          // 适配CFW环境：替换全局window为self（解决window is not defined）
           originalCode = originalCode.replace(/\bwindow\b/g, 'self');
 
+          // 混淆配置项（适配CFW环境，避免语法/运行时错误）
           const obfuscationOptions = {
+              // 基础压缩：开启代码压缩为单行，减少体积，兼容CFW环境
               compact: true,
+              // 控制流扁平化：开启（增加代码混淆复杂度，让逻辑更难阅读）
               controlFlowFlattening: true,
+              // 控制流扁平化阈值：75%的代码会被应用扁平化，平衡混淆强度和运行性能
               controlFlowFlatteningThreshold: 0.75,
+              // 死代码注入：开启（注入无意义的冗余代码，增加逆向难度）
               deadCodeInjection: true,
+              // 字符串数组混淆：开启（将代码中的字符串提取到统一数组，基础混淆手段）
               stringArray: true,
-              stringArrayEncoding: ['none'],    // 关键修复：改为合法数组 ['none']（关闭编码）
+              // 字符串数组编码：设为['none']关闭编码（适配CFW，避免解码逻辑报错；符合配置格式要求）
+              stringArrayEncoding: ['none'],    
+              // 字符串数组提取阈值：100%的字符串都会被提取到数组中
               stringArrayThreshold: 1.0,
-              stringArrayRotate: false,         // 关闭旋转（避免冲突）
-              stringArrayShuffle: false,        // 关闭打乱（避免冲突）
-              stringArrayWrappersCount: 0.75,        // 关闭包装器（避免冲突）
+              // 字符串数组旋转：关闭（避免CFW环境下旋转逻辑导致代码解析冲突）
+              stringArrayRotate: false,         
+              // 字符串数组打乱：关闭（避免CFW环境下打乱数组导致字符串解析失败）
+              stringArrayShuffle: false,        
+              // 字符串数组包装器数量：0（关闭包装器，原0.75是非法值；避免嵌套函数导致CFW解析报错）
+              stringArrayWrappersCount: 0,        
+              // 字符串包装器链式调用：关闭（避免CFW环境下链式调用逻辑冲突）
               stringArrayWrappersChainedCalls: false,
+              // 字符串包装器参数最大数量：设为3（不影响CFW运行，仅限制包装器参数个数）
               stringArrayWrappersParametersMaxCount: 3,
+              // 全局标识符重命名：关闭（核心！避免破坏CFW中ES模块的export default等保留字）
               renameGlobals: false,
+              // 标识符混淆方式：mangled（仅混淆局部变量/函数名，不修改模块/全局保留字）
               identifierNamesGenerator: 'mangled',
+              // 标识符缓存：禁用（每次混淆生成全新的标识符名称，提升混淆程度）
               identifierNamesCache: null,
+              // 标识符前缀：为空（不给混淆后的标识符加额外前缀）
               identifiersPrefix: '',
+              // 对象属性重命名：关闭（避免破坏CFW环境下对象属性的正常访问）
               renameProperties: false,
+              // 属性重命名模式：safe（虽关闭重命名，但保留安全模式配置）
               renamePropertiesMode: 'safe',
+              // 忽略导入标识符混淆：开启（保护import/export语法，适配ES模块）
               ignoreImports: true,
+              // 混淆目标环境：service-worker（适配CFW环境，且是该配置的合法值）
               target: 'service-worker',
+              // 数字转表达式：关闭（避免CFW运行时解析表达式出错）
               numbersToExpressions: false,
+              // 代码简化：关闭（避免过度简化破坏CFW兼容的逻辑）
               simplify: false,
-              splitStrings: false,              // 关闭字符串拆分（核心修复）
+              // 字符串拆分：关闭（核心修复！避免拆分为1字符的拼接逻辑导致CFW报错）
+              splitStrings: false,             
+              // 字符串拆分长度：1（已关闭拆分，仅保留配置项）
               splitStringsChunkLength: 1,
+              // 对象键转换：关闭（避免破坏CFW环境下对象键的正常访问）
               transformObjectKeys: false,
-              unicodeEscapeSequence: true,     // 关闭Unicode转义（核心修复）
+              // Unicode转义：关闭（核心！避免转义字符破坏CFW模块语法/全局变量）
+              unicodeEscapeSequence: false,     
+              // 自保护：关闭（避免生成CFW不兼容的自保护代码）
               selfDefending: false,
+              // 调试保护：关闭（避免CFW运行时因调试限制报错）
               debugProtection: false,
+              // 调试保护间隔：0（已关闭调试保护，设为0即可）
               debugProtectionInterval: 0,
-              disableConsoleOutput: false       // 开启console（方便调试）
+              // 关闭console屏蔽：开启console输出（方便在CFW控制台查看报错，调试后可改为true）
+              disableConsoleOutput: false       
           };
 
+          // 执行代码混淆
           const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
+          
+          // 写入混淆后的文件
           fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
           console.log('成功混淆并保存至 ' + outputFileName);
           EOF
@@ -90,9 +126,14 @@ jobs:
 
       - name: Commit and push the obfuscated file
         run: |
+          # 配置Git提交信息
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 添加混淆后的文件
           git add '_worker.js'
+          
+          # 仅当文件有变更时提交推送
           if git diff --staged --quiet; then
             echo "无修改需要提交"
           else
