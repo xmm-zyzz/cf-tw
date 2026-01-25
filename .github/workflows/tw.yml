@@ -75,7 +75,7 @@ jobs:
               splitStrings: false,              // 关闭字符串拆分（核心修复）
               splitStringsChunkLength: 1,
               transformObjectKeys: false,
-              unicodeEscapeSequence: false,     // 关闭Unicode转义（核心修复）
+              unicodeEscapeSequence: true,     // 关闭Unicode转义（核心修复）
               selfDefending: false,
               debugProtection: false,
               debugProtectionInterval: 0,
