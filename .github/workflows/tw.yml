@@ -66,7 +66,7 @@ jobs:
               // 字符串数组编码：设为['none']关闭编码（适配CFW，避免解码逻辑报错；符合配置格式要求）
               stringArrayEncoding: ['none'],    
               // 字符串数组提取阈值：100%的字符串都会被提取到数组中
-              stringArrayThreshold: 1.0,
+              stringArrayThreshold: 0.5,
               // 字符串数组旋转：关闭（避免CFW环境下旋转逻辑导致代码解析冲突）
               stringArrayRotate: false,         
               // 字符串数组打乱：关闭（避免CFW环境下打乱数组导致字符串解析失败）
@@ -74,9 +74,9 @@ jobs:
               // 字符串数组包装器数量：0（关闭包装器，原0.75是非法值；避免嵌套函数导致CFW解析报错）
               stringArrayWrappersCount: 0,        
               // 字符串包装器链式调用：关闭（避免CFW环境下链式调用逻辑冲突）
-              stringArrayWrappersChainedCalls: false,
+              stringArrayWrappersChainedCalls:true,
               // 字符串包装器参数最大数量：设为3（不影响CFW运行，仅限制包装器参数个数）
-              stringArrayWrappersParametersMaxCount: 3,
+              stringArrayWrappersParametersMaxCount: 5,
               // 全局标识符重命名：关闭（核心！避免破坏CFW中ES模块的export default等保留字）
               renameGlobals: false,
               // 标识符混淆方式：mangled（仅混淆局部变量/函数名，不修改模块/全局保留字）
