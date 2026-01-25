@@ -50,16 +50,16 @@ jobs:
           originalCode = originalCode.replace(/\bwindow\b/g, 'self');
 
           const obfuscationOptions = {
-              compact: true,                  // 保留基础压缩（不破坏语法）
+              compact: true,
               controlFlowFlattening: false,
               controlFlowFlatteningThreshold: 0,
               deadCodeInjection: false,
-              stringArray: true,              // 保留基础字符串数组混淆（适度）
-              stringArrayEncoding: false,     // 关闭base64编码（核心修复）
+              stringArray: true,
+              stringArrayEncoding: ['none'],    // 关键修复：改为合法数组 ['none']（关闭编码）
               stringArrayThreshold: 1.0,
-              stringArrayRotate: false,       // 关闭字符串数组旋转（核心修复）
-              stringArrayShuffle: false,      // 关闭字符串数组打乱（核心修复）
-              stringArrayWrappersCount: 0,    // 关闭字符串包装器（核心修复）
+              stringArrayRotate: false,         // 关闭旋转（避免冲突）
+              stringArrayShuffle: false,        // 关闭打乱（避免冲突）
+              stringArrayWrappersCount: 0,      // 关闭包装器（避免冲突）
               stringArrayWrappersChainedCalls: false,
               stringArrayWrappersParametersMaxCount: 3,
               renameGlobals: false,
@@ -72,14 +72,14 @@ jobs:
               target: 'service-worker',
               numbersToExpressions: false,
               simplify: false,
-              splitStrings: false,            // 关闭字符串拆分（核心修复）
+              splitStrings: false,              // 关闭字符串拆分（核心修复）
               splitStringsChunkLength: 1,
               transformObjectKeys: false,
-              unicodeEscapeSequence: false,   // 关闭Unicode转义（核心修复）
+              unicodeEscapeSequence: false,     // 关闭Unicode转义（核心修复）
               selfDefending: false,
               debugProtection: false,
               debugProtectionInterval: 0,
-              disableConsoleOutput: false     // 关闭console屏蔽（方便调试）
+              disableConsoleOutput: false       // 开启console（方便调试）
           };
 
           const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
