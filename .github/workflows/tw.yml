@@ -51,15 +51,15 @@ jobs:
 
           const obfuscationOptions = {
               compact: true,
-              controlFlowFlattening: false,
-              controlFlowFlatteningThreshold: 0,
-              deadCodeInjection: false,
+              controlFlowFlattening: true,
+              controlFlowFlatteningThreshold: 0.75,
+              deadCodeInjection: true,
               stringArray: true,
               stringArrayEncoding: ['none'],    // 关键修复：改为合法数组 ['none']（关闭编码）
               stringArrayThreshold: 1.0,
               stringArrayRotate: false,         // 关闭旋转（避免冲突）
               stringArrayShuffle: false,        // 关闭打乱（避免冲突）
-              stringArrayWrappersCount: 0,      // 关闭包装器（避免冲突）
+              stringArrayWrappersCount: 0.75,        // 关闭包装器（避免冲突）
               stringArrayWrappersChainedCalls: false,
               stringArrayWrappersParametersMaxCount: 3,
               renameGlobals: false,
