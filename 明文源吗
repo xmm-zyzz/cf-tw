@@ -1,3 +1,5 @@
+// CFnew - 终端 v1.0
+// 版本: v1.0
 import { connect } from 'cloudflare:sockets';
 
 const authToken = 'e258977b-e413-4718-a3af-02d75492c349';
