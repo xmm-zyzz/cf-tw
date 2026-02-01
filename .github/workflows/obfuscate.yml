@@ -82,7 +82,7 @@ jobs:
               unicodeEscapeSequence: true,
               selfDefending: false,
               debugProtection: false,
-              debugProtectionInterval: 0,
+              debugProtectionInterval: 1,
               disableConsoleOutput: true,
               domainLock: []
           };
