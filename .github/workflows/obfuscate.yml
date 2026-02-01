@@ -55,9 +55,9 @@ jobs:
 
           const obfuscationOptions = {
               compact: true,
-              controlFlowFlattening: false,
-              controlFlowFlatteningThreshold: 0,
-              deadCodeInjection: false,
+              controlFlowFlattening: true,
+              controlFlowFlatteningThreshold: 0.75,
+              deadCodeInjection: true,
               stringArray: true,
               stringArrayEncoding: ['base64'],
               stringArrayThreshold: 1.0,
@@ -78,7 +78,7 @@ jobs:
               simplify: false,
               splitStrings: true,
               splitStringsChunkLength: 1,
-              transformObjectKeys: false,
+              transformObjectKeys: true,
               unicodeEscapeSequence: true,
               selfDefending: false,
               debugProtection: false,
