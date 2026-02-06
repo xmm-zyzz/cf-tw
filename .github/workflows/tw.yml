@@ -38,7 +38,7 @@ jobs:
           const path = require('path');
           
           const sourceFileName = 'ech-tw';
-          const outputFileName = '_wokrs.js';
+          const outputFileName = '_worker.js';
           const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
           if (!fs.existsSync(sourceFilePath)) {
@@ -98,7 +98,7 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add '_wkors.js'
+          git add '_worker.js'
           if git diff --staged --quiet; then
             echo "No changes to commit, the obfuscated file is already up-to-date."
           else
