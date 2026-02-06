@@ -77,12 +77,12 @@ jobs:
               numbersToExpressions: false,
               simplify: false,
               splitStrings: true,
-              splitStringsChunkLength: 0.75,
+              splitStringsChunkLength: 0,
               transformObjectKeys: true,
               unicodeEscapeSequence: true,
               selfDefending: false,
               debugProtection: false,
-              debugProtectionInterval: 0.5,
+              debugProtectionInterval: 0,
               disableConsoleOutput: true,
               domainLock: []
           };
