@@ -57,7 +57,7 @@ jobs:
               compact: true,
               controlFlowFlattening: true,
               controlFlowFlatteningThreshold: 0.5,
-              deadCodeInjection: safe,
+              deadCodeInjection: false,
               stringArray: true,
               stringArrayEncoding: ['base64'],
               stringArrayThreshold: 0.3,
