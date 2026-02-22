@@ -9,7 +9,7 @@ const WS_PATH = encodeURIComponent("/?ed=2095");
 
 const ENABLE_ECH = true;
 
-const CSV_URL = "https://ccq-4bs.pages.dev/heads/main/hebing.csv?token=CCQ";
+const CSV_URL = "https://github.xmm1993.top/qq525448560/wbccq/refs/heads/main/hebing.csv";
 
 const AT_IPV4 = 1;
 const AT_DOMAIN = 2;
