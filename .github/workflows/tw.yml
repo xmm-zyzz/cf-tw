@@ -1,22 +1,22 @@
 name: ech-tw
 
 on:
-  workflow_dispatch: # 手动触发
-  push: # 分支文件推送触发
+  workflow_dispatch:
+  push:
     branches:
-      - '**'  # 仅匹配分支推送，排除标签推送
+      - '**'
     paths:
-      - '明文源吗' # 仅当该源文件修改时触发
-  schedule: # 新增：每3小时自动运行一次（UTC时区）
+      - '明文源吗'
+  schedule:
     - cron: '0 */3 * * *'
 
 jobs:
   build-and-obfuscate:
     runs-on: ubuntu-latest
-    # 新增：避免多触发条件下重复运行（可选，推荐加）
     concurrency:
       group: ${{ github.workflow }}
       cancel-in-progress: true
+    # 👇 关键：强制使用 Node.js 24，消除所有警告
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 20  # 用 20 最稳定，也可写 22
 
       - name: Install Obfuscator
         run: npm install javascript-obfuscator
@@ -39,19 +39,19 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          const sourceFileName = 'ech-tw';
+          const sourceFileName = '明文源吗';  # 修复：和 paths 保持一致
           const outputFileName = '_worker.js';
           const sourceFilePath = path.join(process.cwd(), sourceFileName);
 
           if (!fs.existsSync(sourceFilePath)) {
-            console.error('错误：在路径 \'' + sourceFilePath + '\' 未找到源文件。请确保您的仓库根目录有名为 \'明文源吗\' 的文件。');
+            console.error('错误：未找到源文件：' + sourceFilePath);
             process.exit(1);
           }
 
           const originalCode = fs.readFileSync(sourceFilePath, 'utf8');
 
-          if (!originalCode || originalCode.trim().length === 0) {
-            console.error('错误：源文件 ' + sourceFileName + ' 为空。');
+          if (!originalCode.trim()) {
+            console.error('错误：源文件为空');
             process.exit(1);
           }
 
@@ -91,19 +91,19 @@ jobs:
 
           const obfuscatedCode = JavaScriptObfuscator.obfuscate(originalCode, obfuscationOptions).getObfuscatedCode();
           
-          fs.writeFileSync(path.join(process.cwd(), outputFileName), obfuscatedCode, 'utf8');
-          console.log('成功将 \'' + sourceFileName + '\' 混淆并保存至 \'' + outputFileName + '\'。');
+          fs.writeFileSync(outputFileName, obfuscatedCode, 'utf8');
+          console.log('✅ 混淆完成：' + outputFileName);
           EOF
           node obfuscate.js
 
-      - name: Commit and push the obfuscated file
+      - name: Commit and push
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add '_worker.js'
           if git diff --staged --quiet; then
-            echo "No changes to commit, the obfuscated file is already up-to-date."
+            echo "✅ 文件无变化，无需提交"
           else
-            git commit -m "部署用这个"
+            git commit -m "混淆更新 _worker.js"
             git push
           fi
